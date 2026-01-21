@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Childcare Invoice / Refund</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #eef2f5;
+    padding: 20px;
+    color: #000;
+}
+
+.container {
+    max-width: 950px;
+    margin: auto;
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+}
+
+h1 {
+    text-align: center;
+    color: #003366;
+}
+
+label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+}
+
+textarea {
+    resize: vertical;
+}
+
+button {
+    margin-top: 10px;
+    padding: 10px;
+    background: #003366;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #002244;
+}
+
+.add-btn {
+    background: #666;
+    width: 100%;
+}
+
+.remove-btn {
+    background: #aa0000;
+}
+
+.invoice {
+    margin-top: 30px;
+    padding: 25px;
+    border: 1px solid #ccc;
+    position: relative;
+    background: #fff;
+}
+
+/* Logo centered and bigger */
+.invoice .logo {
+    display: block;
+    margin: 0 auto 10px;
+    max-height: 110px;
+}
+
+/* watermark centered */
+.invoice .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.08;
+    width: 420px;
+    height: auto;
+}
+
+/* right border line (works in print) */
+.invoice {
+    border-right: 2px solid #ccc;
+    border-left: 1px solid #ccc;
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+}
+
+.total {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.print-btn {
+    background: green;
+    width: 100%;
+}
+
+.charge-row {
+    border: 1px dashed #ccc;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+/* NIGHT MODE */
+body.night {
+    background: #1b1b1b;
+    color: #ddd;
+}
+
+body.night .container {
+    background: #222;
+    color: #ddd;
+}
+
+body.night input,
+body.night select,
+body.night textarea {
+    background: #333;
+    color: #ddd;
+    border: 1px solid #555;
+}
+
+body.night .invoice {
+    border-color: #444;
+}
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 700px) {
+    .container {
+        padding: 15px;
+    }
+    button {
+        width: 100%;
+    }
+    .charge-row {
+        padding: 8px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>Childcare Invoice / Refund</h1>
+
+<button onclick="toggleNightMode()">Toggle Night Mode</button>
+
+<!-- Fixed Business Details -->
+<label>Business Name</label>
+<input id="business" value="MOM Child Daycare" readonly>
+
+<label>Business Address</label>
+<input id="address" value="106 Nemeiben Rd, Saskatoon, SK S7J 4S6" readonly>
+
+<label>Phone Number</label>
+<input id="phone" value="306-612-0221" readonly>
+
+<label>License Number</label>
+<input id="license" value="1234" readonly>
+
+<hr>
+
+<label>Parent / Guardian Name</label>
+<input id="parent" list="parentList" oninput="fillChildren()">
+<datalist id="parentList"></datalist>
+
+<label>Child Name</label>
+<input id="child" list="childList">
+<datalist id="childList"></datalist>
+
+<label>Issue Date</label>
+<input type="date" id="issueDate">
+
+<label>Service Start Date</label>
+<input type="date" id="startDate">
+
+<label>Service End Date</label>
+<input type="date" id="endDate">
+
+<label>Document Type</label>
+<select id="type">
+    <option value="Invoice">Invoice</option>
+    <option value="Refund">Refund</option>
+</select>
+
+<label id="refundLabel" style="display:none;">Refund Reason</label>
+<textarea id="refundNote" style="display:none;"
+placeholder="Illness, withdrawal, overpayment, closure, etc."></textarea>
+
+<hr>
+
+<label>Base Amount ($)</label>
+<input type="number" step="0.01" id="baseAmount">
+
+<h3>Additional Charges</h3>
+<div id="charges"></div>
+
+<button class="add-btn" onclick="addCharge()">+ Add Additional Charge</button>
+
+<hr>
+
+<label>Tax Option</label>
+<select id="tax">
+    <option value="NONE">No Tax</option>
+    <option value="GST">GST (5%)</option>
+    <option value="GSTPST">GST (5%) + PST (6%)</option>
+</select>
+
+<button onclick="generate()">Generate</button>
+
+<div class="invoice" id="output"></div>
+
+<button class="print-btn" onclick="printInvoice()">Print / Save as PDF</button>
+</div>
+
+<script>
+/* 🔧 REPLACE THESE WITH YOUR REAL IMAGE LINKS */
+const LOGO_URL = "https://i.postimg.cc/sgGjXPgB/MOM-Childdaycare-Logo3-removebg-preview.png";
+const WATERMARK_URL = "https://i.postimg.cc/VNjz9Yt2/MOM-Childdaycare-Logo2-removebg-preview.png";
+
+/* Default issue date to today */
+document.getElementById("issueDate").value = new Date().toISOString().split('T')[0];
+
+/* NIGHT MODE TOGGLE */
+function toggleNightMode() {
+    document.body.classList.toggle("night");
+}
+
+/* Show refund reason only when Refund selected */
+document.getElementById("type").addEventListener("change", function () {
+    const show = this.value === "Refund";
+    document.getElementById("refundNote").style.display = show ? "block" : "none";
+    document.getElementById("refundLabel").style.display = show ? "block" : "none";
+});
+
+/* Load saved parent/child data */
+let families = JSON.parse(localStorage.getItem("families") || "{}");
+updateParentList();
+
+function updateParentList() {
+    const list = document.getElementById("parentList");
+    list.innerHTML = "";
+    Object.keys(families).forEach(parent => {
+        const option = document.createElement("option");
+        option.value = parent;
+        list.appendChild(option);
+    });
+}
+
+function fillChildren() {
+    const parentName = document.getElementById("parent").value;
+    const childList = document.getElementById("childList");
+    childList.innerHTML = "";
+
+    if (families[parentName]) {
+        families[parentName].forEach(child => {
+            const option = document.createElement("option");
+            option.value = child;
+            childList.appendChild(option);
+        });
+    }
+}
+
+/* Add additional charge row */
+function addCharge() {
+    const container = document.getElementById("charges");
+
+    const div = document.createElement("div");
+    div.className = "charge-row";
+
+    div.innerHTML = `
+        <label>Charge Reason</label>
+        <input class="charge-reason" placeholder="Late pickup, admin fee, etc.">
+
+        <label>Charge Amount ($)</label>
+        <input type="number" step="0.01" class="charge-amount" value="0">
+
+        <button class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+    `;
+
+    container.appendChild(div);
+}
+
+/* Generate invoice / refund */
+function generate() {
+    const business = document.getElementById("business").value;
+    const address = document.getElementById("address").value;
+    const phone = document.getElementById("phone").value;
+    const license = document.getElementById("license").value;
+    const parent = document.getElementById("parent").value;
+    const child = document.getElementById("child").value;
+    const issueDate = document.getElementById("issueDate").value;
+    const start = document.getElementById("startDate").value;
+    const end = document.getElementById("endDate").value;
+    const type = document.getElementById("type").value;
+    const refundReason = document.getElementById("refundNote").value;
+
+    const base = parseFloat(document.getElementById("baseAmount").value || 0);
+
+    // Save parent & child in localStorage
+    if (parent && child) {
+        if (!families[parent]) families[parent] = [];
+        if (!families[parent].includes(child)) families[parent].push(child);
+        localStorage.setItem("families", JSON.stringify(families));
+        updateParentList();
+    }
+
+    let subtotal = base;
+    let chargeLines = "";
+
+    document.querySelectorAll(".charge-row").forEach(row => {
+        const reason = row.querySelector(".charge-reason").value;
+        const amount = parseFloat(row.querySelector(".charge-amount").value || 0);
+        if (amount > 0 && reason) {
+            subtotal += amount;
+            chargeLines += `<p>${reason}: $${amount.toFixed(2)}</p>`;
+        }
+    });
+
+    let gst = 0, pst = 0;
+    const taxType = document.getElementById("tax").value;
+
+    if (taxType === "GST") gst = subtotal * 0.05;
+    if (taxType === "GSTPST") {
+        gst = subtotal * 0.05;
+        pst = subtotal * 0.06;
+    }
+
+    const total = subtotal + gst + pst;
+
+    document.getElementById("output").innerHTML = `
+        <img src="${LOGO_URL}" class="logo">
+        <img src="${WATERMARK_URL}" class="watermark">
+
+        <h2>${type}</h2>
+        <p><strong>${business}</strong></p>
+        <p>${address}</p>
+        <p>Phone: ${phone}</p>
+        <p>License #: ${license}</p>
+        <hr>
+
+        <p><strong>Issue Date:</strong> ${issueDate}</p>
+        <p><strong>Parent:</strong> ${parent}</p>
+        <p><strong>Child:</strong> ${child}</p>
+        <p><strong>Service Period:</strong> ${start} to ${end}</p>
+
+        ${type === "Refund" ? `<p><strong>Refund Reason:</strong> ${refundReason}</p>` : ""}
+
+        <hr>
+        <p>Base Amount: $${base.toFixed(2)}</p>
+        ${chargeLines}
+        <p>Subtotal: $${subtotal.toFixed(2)}</p>
+        <p>GST: $${gst.toFixed(2)}</p>
+        <p>PST: $${pst.toFixed(2)}</p>
+
+        <p class="total">Total: $${total.toFixed(2)}</p>
+    `;
+}
+
+/* NEW PRINT FUNCTION */
+function printInvoice() {
+    const invoiceContent = document.getElementById("output").innerHTML;
+    const printWindow = window.open('', '', 'height=800,width=800');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Print Invoice</title>
+                <style>
+                    body { font-family: Arial; padding: 20px; }
+                    .invoice { border: 2px solid #ccc; padding: 25px; }
+                    .logo { display:block; margin:0 auto 10px; max-height:110px; }
+                    .watermark { position:absolute; top:50%; left:50%; transform: translate(-50%, -50%); opacity:0.08; width:420px; }
+                    @page { margin: 0.6in; }
+                </style>
+            </head>
+            <body>
+                <div class="invoice">
+                    ${invoiceContent}
+                </div>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+</script>
+
+</body>
+</html>
