@@ -71,14 +71,12 @@ button:hover {
     background: #fff;
 }
 
-/* Logo centered and bigger */
 .invoice .logo {
     display: block;
     margin: 0 auto 10px;
     max-height: 110px;
 }
 
-/* watermark centered */
 .invoice .watermark {
     position: absolute;
     top: 50%;
@@ -89,7 +87,6 @@ button:hover {
     height: auto;
 }
 
-/* right border line (works in print) */
 .invoice {
     border-right: 2px solid #ccc;
     border-left: 1px solid #ccc;
@@ -158,7 +155,6 @@ body.night .invoice {
 
 <button onclick="toggleNightMode()">Toggle Night Mode</button>
 
-<!-- Fixed Business Details -->
 <label>Business Name</label>
 <input id="business" value="MOM Child Daycare" readonly>
 
@@ -190,6 +186,12 @@ body.night .invoice {
 <label>Service End Date</label>
 <input type="date" id="endDate">
 
+<!-- Due Date (Hidden for Refund) -->
+<div id="dueSection">
+  <label>Due Date</label>
+  <input type="date" id="dueDate">
+</div>
+
 <label>Document Type</label>
 <select id="type">
     <option value="Invoice">Invoice</option>
@@ -219,6 +221,27 @@ placeholder="Illness, withdrawal, overpayment, closure, etc."></textarea>
     <option value="GSTPST">GST (5%) + PST (6%)</option>
 </select>
 
+<hr>
+
+<!-- Late Fee Options (Hidden for Refund) -->
+<div id="lateSection">
+  <label>Show Late Fee Totals</label>
+  <select id="lateOption">
+      <option value="BEFORE">Before Due Date (show only total)</option>
+      <option value="AFTER">After Due Date (show both totals)</option>
+  </select>
+
+  <label>Late Fee Type</label>
+  <select id="lateFeeType">
+      <option value="NONE">No Late Fee</option>
+      <option value="FIXED">Fixed Amount</option>
+      <option value="PERCENT">Percentage</option>
+  </select>
+
+  <label>Late Fee Amount</label>
+  <input type="number" step="0.01" id="lateFeeAmount" value="0">
+</div>
+
 <button onclick="generate()">Generate</button>
 
 <div class="invoice" id="output"></div>
@@ -227,26 +250,27 @@ placeholder="Illness, withdrawal, overpayment, closure, etc."></textarea>
 </div>
 
 <script>
-/* 🔧 REPLACE THESE WITH YOUR REAL IMAGE LINKS */
 const LOGO_URL = "https://i.postimg.cc/sgGjXPgB/MOM-Childdaycare-Logo3-removebg-preview.png";
 const WATERMARK_URL = "https://i.postimg.cc/VNjz9Yt2/MOM-Childdaycare-Logo2-removebg-preview.png";
 
-/* Default issue date to today */
 document.getElementById("issueDate").value = new Date().toISOString().split('T')[0];
 
-/* NIGHT MODE TOGGLE */
 function toggleNightMode() {
     document.body.classList.toggle("night");
 }
 
-/* Show refund reason only when Refund selected */
 document.getElementById("type").addEventListener("change", function () {
-    const show = this.value === "Refund";
-    document.getElementById("refundNote").style.display = show ? "block" : "none";
-    document.getElementById("refundLabel").style.display = show ? "block" : "none";
+    const isRefund = this.value === "Refund";
+
+    // Show/Hide refund reason
+    document.getElementById("refundNote").style.display = isRefund ? "block" : "none";
+    document.getElementById("refundLabel").style.display = isRefund ? "block" : "none";
+
+    // Hide due date & late fee options for refund
+    document.getElementById("dueSection").style.display = isRefund ? "none" : "block";
+    document.getElementById("lateSection").style.display = isRefund ? "none" : "block";
 });
 
-/* Load saved parent/child data */
 let families = JSON.parse(localStorage.getItem("families") || "{}");
 updateParentList();
 
@@ -274,7 +298,6 @@ function fillChildren() {
     }
 }
 
-/* Add additional charge row */
 function addCharge() {
     const container = document.getElementById("charges");
 
@@ -294,7 +317,6 @@ function addCharge() {
     container.appendChild(div);
 }
 
-/* Generate invoice / refund */
 function generate() {
     const business = document.getElementById("business").value;
     const address = document.getElementById("address").value;
@@ -305,12 +327,12 @@ function generate() {
     const issueDate = document.getElementById("issueDate").value;
     const start = document.getElementById("startDate").value;
     const end = document.getElementById("endDate").value;
+    const dueDate = document.getElementById("dueDate").value;
     const type = document.getElementById("type").value;
     const refundReason = document.getElementById("refundNote").value;
 
     const base = parseFloat(document.getElementById("baseAmount").value || 0);
 
-    // Save parent & child in localStorage
     if (parent && child) {
         if (!families[parent]) families[parent] = [];
         if (!families[parent].includes(child)) families[parent].push(child);
@@ -339,7 +361,35 @@ function generate() {
         pst = subtotal * 0.06;
     }
 
-    const total = subtotal + gst + pst;
+    let totalDisplay = "";
+
+    // If invoice show late fee totals
+    if (type === "Invoice") {
+        let lateFee = 0;
+        const lateFeeType = document.getElementById("lateFeeType").value;
+        const lateFeeAmount = parseFloat(document.getElementById("lateFeeAmount").value || 0);
+
+        if (lateFeeType === "FIXED") lateFee = lateFeeAmount;
+        if (lateFeeType === "PERCENT") lateFee = subtotal * (lateFeeAmount / 100);
+
+        const onTimeTotal = subtotal + gst + pst;
+        const lateTotal = subtotal + gst + pst + lateFee;
+
+        const lateOption = document.getElementById("lateOption").value;
+
+        if (lateOption === "AFTER") {
+            totalDisplay = `
+                <p><strong>Total Before Due Date:</strong> $${onTimeTotal.toFixed(2)}</p>
+                <p><strong>Total After Due Date:</strong> $${lateTotal.toFixed(2)}</p>
+            `;
+        } else {
+            totalDisplay = `<p class="total">Total: $${onTimeTotal.toFixed(2)}</p>`;
+        }
+    } else {
+        // Refund only shows total
+        const refundTotal = subtotal + gst + pst;
+        totalDisplay = `<p class="total">Total Refund: $${refundTotal.toFixed(2)}</p>`;
+    }
 
     document.getElementById("output").innerHTML = `
         <img src="${LOGO_URL}" class="logo">
@@ -356,6 +406,7 @@ function generate() {
         <p><strong>Parent:</strong> ${parent}</p>
         <p><strong>Child:</strong> ${child}</p>
         <p><strong>Service Period:</strong> ${start} to ${end}</p>
+        ${type === "Invoice" ? `<p><strong>Due Date:</strong> ${dueDate}</p>` : ""}
 
         ${type === "Refund" ? `<p><strong>Refund Reason:</strong> ${refundReason}</p>` : ""}
 
@@ -366,11 +417,10 @@ function generate() {
         <p>GST: $${gst.toFixed(2)}</p>
         <p>PST: $${pst.toFixed(2)}</p>
 
-        <p class="total">Total: $${total.toFixed(2)}</p>
+        ${totalDisplay}
     `;
 }
 
-/* NEW PRINT FUNCTION */
 function printInvoice() {
     const invoiceContent = document.getElementById("output").innerHTML;
     const printWindow = window.open('', '', 'height=800,width=800');
@@ -400,5 +450,3 @@ function printInvoice() {
 
 </body>
 </html>
-
-
