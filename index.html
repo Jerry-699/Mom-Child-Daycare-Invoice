@@ -161,6 +161,9 @@ body.night .invoice {
 <label>Business Address</label>
 <input id="address" value="106 Nemeiben Rd, Saskatoon, SK S7J 4S6" readonly>
 
+<label>Email</label>
+<input id="email" value="Momchilddaycare@gmail.com" readonly>
+
 <label>Phone Number</label>
 <input id="phone" value="306-612-0221" readonly>
 
@@ -200,12 +203,12 @@ body.night .invoice {
 
 <label id="refundLabel" style="display:none;">Refund Reason</label>
 <textarea id="refundNote" style="display:none;"
-placeholder="Illness, withdrawal, overpayment, closure, etc."></textarea>
+placeholder="Illness, security deposit, overpayment, closure, etc."></textarea>
 
 <hr>
 
 <label>Base Amount ($)</label>
-<input type="number" step="0.01" id="baseAmount">
+<input type="number" step="217.50" id="baseAmount">
 
 <h3>Additional Charges</h3>
 <div id="charges"></div>
@@ -320,6 +323,7 @@ function addCharge() {
 function generate() {
     const business = document.getElementById("business").value;
     const address = document.getElementById("address").value;
+    const email = document.getElementById("email").value;
     const phone = document.getElementById("phone").value;
     const license = document.getElementById("license").value;
     const parent = document.getElementById("parent").value;
@@ -379,8 +383,8 @@ function generate() {
 
         if (lateOption === "AFTER") {
             totalDisplay = `
-                <p><strong>Total Before Due Date:</strong> $${onTimeTotal.toFixed(2)}</p>
-                <p><strong>Total After Due Date:</strong> $${lateTotal.toFixed(2)}</p>
+                <p><strong>Total if paid on time:</strong> $${onTimeTotal.toFixed(2)}</p>
+                <p><strong>Total if paid late:</strong> $${lateTotal.toFixed(2)}</p>
             `;
         } else {
             totalDisplay = `<p class="total">Total: $${onTimeTotal.toFixed(2)}</p>`;
@@ -398,6 +402,7 @@ function generate() {
         <h2>${type}</h2>
         <p><strong>${business}</strong></p>
         <p>${address}</p>
+        <p>Email: ${email}</p>
         <p>Phone: ${phone}</p>
         <p>License #: ${license}</p>
         <hr>
@@ -405,7 +410,9 @@ function generate() {
         <p><strong>Issue Date:</strong> ${issueDate}</p>
         <p><strong>Parent:</strong> ${parent}</p>
         <p><strong>Child:</strong> ${child}</p>
-        <p><strong>Service Period:</strong> ${start} to ${end}</p>
+        
+        ${(start || end) ? `<p><strong>Service Period:</strong> ${start || "—"} to ${end || "—"}</p>` : ""}
+
         ${type === "Invoice" ? `<p><strong>Due Date:</strong> ${dueDate}</p>` : ""}
 
         ${type === "Refund" ? `<p><strong>Refund Reason:</strong> ${refundReason}</p>` : ""}
